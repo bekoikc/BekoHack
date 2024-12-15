@@ -126,3 +126,4 @@ if random_port:
 
 # Bilgilendirme
 print(f"\nTüm sonuçlar '{output_file}' dosyasına kaydedildi.")
+
