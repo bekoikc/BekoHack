@@ -87,10 +87,10 @@ run_command(f"fierce -dns {site}", "fierce Sonucu")
 run_command(f"traceroute {site}", "traceroute Sonucu")
 
 # 2. Nmap ile Port Tarama ve Zafiyet Analizi
-if ports:
-    formatted_ports = ",".join(ports)
-    run_command(f"nmap -Pn -p {formatted_ports} {site}", f"nmap Sonucu ({formatted_ports})")
-run_command(f"nmap -Pn -sV --script=vuln {site}", "Nmap Zafiyet Taraması")
+#if ports:
+    #formatted_ports = ",".join(ports)
+    #run_command(f"nmap -Pn -p {formatted_ports} {site}", f"nmap Sonucu ({formatted_ports})")
+#run_command(f"nmap -Pn -sV --script=vuln {site}", "Nmap Zafiyet Taraması")
 
 # 3. SQL Injection Testi
 sql_test = input("\nSQL Injection testi yapmak istiyor musunuz? (E/h): ").strip().lower()
